@@ -1,0 +1,21 @@
+{
+  "name": "obsidian-crisp-dsh",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness (DSH) integration for Obsidian with frosted glass UI, hover navigation, and context actions.",
+  "main": "main.js",
+  "scripts": {
+    "check": "node -c main.js"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "ai",
+    "agent"
+  ],
+  "author": "letschips",
+  "license": "MIT",
+  "homepage": "https://github.com/letschips/crisp-dsh"
+}

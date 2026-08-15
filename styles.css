@@ -1,0 +1,610 @@
+/* ==========================================================================
+   Crisp DSH - DeepSeek Harness Right Sidebar Workspace
+   Crafted by letschips (Xiaohongshu)
+   Matching Crisp Suite Design Language (Crisp ASR / Crisp Base / Crisp Style)
+   ========================================================================== */
+
+/* Workspace Leaf Content Override - Translucency & Ambient Glow */
+.workspace-leaf-content[data-type="crisp-dsh-view"] .view-content {
+  padding: 0 !important;
+  background:
+    radial-gradient(
+      circle at 88% 4%,
+      color-mix(in srgb, #4D6BFE 12%, transparent),
+      transparent 38%
+    ),
+    var(--background-primary);
+  overflow: hidden;
+}
+
+/* Root View */
+.crisp-dsh-view {
+  --crisp-dsh-accent: #4D6BFE;
+  --crisp-dsh-border: color-mix(in srgb, var(--text-normal) 9%, transparent);
+  --crisp-dsh-surface: color-mix(
+    in srgb,
+    var(--background-secondary) 76%,
+    transparent
+  );
+  --crisp-dsh-offset: 52px;
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Shell Layout */
+.crisp-dsh-shell {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  padding: 16px 14px 16px;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Header Area */
+.crisp-dsh-header {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.crisp-dsh-identity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 11px;
+}
+
+.crisp-dsh-identity-text {
+  min-width: 0;
+}
+
+.crisp-dsh-identity-text h2,
+.crisp-dsh-identity-text p {
+  margin: 0;
+}
+
+.crisp-dsh-identity-text h2 {
+  font-weight: 680;
+  font-size: 16.5px;
+  letter-spacing: -0.02em;
+  color: var(--text-normal);
+  line-height: 1.2;
+}
+
+.crisp-dsh-identity-text p {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller, 11px);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+@media (max-width: 340px) {
+  .crisp-dsh-identity-text p {
+    display: none;
+  }
+  .crisp-dsh-shell {
+    padding: 12px 10px 12px;
+    gap: 8px;
+  }
+}
+
+/* DeepSeek Color Mark with Ambient Glow */
+.crisp-dsh-mark {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(77, 107, 254, 0.28);
+  border-radius: 12px;
+  background: color-mix(in srgb, #4D6BFE 10%, var(--background-primary));
+  box-shadow: 0 8px 22px rgba(77, 107, 254, 0.18);
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+.crisp-dsh-mark svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.crisp-dsh-mark.is-online {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.25), 0 8px 22px rgba(77, 107, 254, 0.15);
+  border-color: rgba(77, 107, 254, 0.35);
+}
+
+.crisp-dsh-mark.is-offline {
+  border-color: rgba(239, 68, 68, 0.28);
+  box-shadow: 0 8px 22px rgba(239, 68, 68, 0.14);
+}
+
+/* Header Right Area: Actions + Status Capsules */
+.crisp-dsh-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Capsule Action Group */
+.crisp-dsh-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--background-secondary) 75%, transparent);
+  border: 1px solid var(--crisp-dsh-border);
+  border-radius: 999px;
+  padding: 3px 5px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px color-mix(in srgb, black 4%, transparent);
+}
+
+.crisp-dsh-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.crisp-dsh-action-btn:hover {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--text-normal) 12%, transparent);
+  transform: scale(1.06);
+}
+
+.crisp-dsh-action-btn:active {
+  transform: scale(0.92);
+}
+
+.crisp-dsh-action-btn.is-active {
+  color: #4D6BFE;
+  background: rgba(77, 107, 254, 0.15);
+}
+
+.crisp-dsh-action-btn svg {
+  width: 13.5px;
+  height: 13.5px;
+  stroke-width: 2.1;
+}
+
+/* Capsule Status Pill */
+.crisp-dsh-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  min-height: 32px;
+  box-sizing: border-box;
+  border: 1px solid var(--crisp-dsh-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-secondary) 75%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 8px color-mix(in srgb, black 4%, transparent);
+  transition: all 0.2s ease;
+}
+
+.crisp-dsh-status:hover {
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  color: var(--text-normal);
+  transform: translateY(-0.5px);
+}
+
+.crisp-dsh-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.crisp-dsh-status.is-online {
+  border-color: color-mix(in srgb, #22c55e 35%, transparent);
+  background: color-mix(in srgb, #22c55e 12%, var(--background-secondary));
+  color: #22c55e;
+}
+
+.crisp-dsh-status.is-online .crisp-dsh-status-dot {
+  background-color: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.7);
+}
+
+.crisp-dsh-status.is-offline {
+  border-color: color-mix(in srgb, var(--color-red, #ef4444) 35%, transparent);
+  background: color-mix(in srgb, var(--color-red, #ef4444) 10%, var(--background-secondary));
+  color: var(--color-red, #ef4444);
+}
+
+.crisp-dsh-status.is-offline .crisp-dsh-status-dot {
+  background-color: #ef4444;
+}
+
+.crisp-dsh-status.is-connecting {
+  border-color: color-mix(in srgb, #f59e0b 35%, transparent);
+  background: color-mix(in srgb, #f59e0b 10%, var(--background-secondary));
+  color: #f59e0b;
+}
+
+.crisp-dsh-status.is-connecting .crisp-dsh-status-dot {
+  background-color: #f59e0b;
+  animation: crispDshPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes crispDshPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Crisp Frosted Glass Card (Clean 100% Smooth Rounded Corners) */
+.crisp-dsh-card {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--crisp-dsh-border);
+  border-radius: 14px;
+  background: var(--crisp-dsh-surface);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 6%, transparent),
+    0 10px 30px color-mix(in srgb, black 8%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-sizing: border-box;
+}
+
+/* Iframe Body Viewport & Sliding Wrapper */
+.crisp-dsh-iframe-viewport {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 13px;
+  background: transparent;
+}
+
+/* Left Hover Trigger Zone */
+.crisp-dsh-hover-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 100%;
+  z-index: 25;
+  display: none;
+  cursor: pointer;
+}
+
+.crisp-dsh-hover-handle {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 36px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-normal) 25%, transparent);
+  opacity: 0;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.crisp-dsh-hover-zone:hover .crisp-dsh-hover-handle {
+  opacity: 1;
+  background: #4D6BFE;
+  box-shadow: 0 0 12px rgba(77, 107, 254, 0.7);
+  height: 48px;
+}
+
+/* Sliding Frame Wrapper */
+.crisp-dsh-frame-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transition: left 0.28s cubic-bezier(0.16, 1, 0.3, 1), width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  border-radius: 13px;
+  background: transparent;
+}
+
+/* Mode 1: Auto-Hide on Hover (Triggers only when left strip is active) */
+.crisp-dsh-iframe-viewport.is-mode-hover .crisp-dsh-hover-zone {
+  display: block;
+}
+
+/* Default Collapsed State */
+.crisp-dsh-iframe-viewport.is-mode-hover .crisp-dsh-frame-wrapper,
+.crisp-dsh-iframe-viewport.is-manual-hidden .crisp-dsh-frame-wrapper {
+  left: calc(-1 * var(--crisp-dsh-offset, 52px));
+  width: calc(100% + var(--crisp-dsh-offset, 52px));
+}
+
+/* Expanded State */
+.crisp-dsh-iframe-viewport.is-hover-expanded .crisp-dsh-frame-wrapper,
+.crisp-dsh-iframe-viewport.is-mode-always .crisp-dsh-frame-wrapper {
+  left: 0px !important;
+  width: 100% !important;
+}
+
+.crisp-dsh-iframe-viewport.is-manual-hidden .crisp-dsh-hover-zone {
+  display: block;
+}
+
+.crisp-dsh-iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block;
+  border-radius: 13px;
+  background: transparent !important;
+}
+
+/* Offline & Error Fallback Inside Card */
+.crisp-dsh-fallback-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  z-index: 30;
+  border-radius: 13px;
+  overflow-y: auto;
+}
+
+.crisp-dsh-fallback-inner {
+  width: 100%;
+  max-width: 300px;
+  text-align: center;
+  animation: crispDshFadeIn 0.25s ease-out;
+}
+
+@keyframes crispDshFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.crisp-dsh-fallback-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: color-mix(in srgb, #4D6BFE 12%, transparent);
+  color: #4D6BFE;
+  margin-bottom: 14px;
+  border: 1px solid rgba(77, 107, 254, 0.25);
+  box-shadow: 0 6px 18px rgba(77, 107, 254, 0.14);
+}
+
+.crisp-dsh-fallback-hero svg {
+  width: 24px;
+  height: 24px;
+}
+
+.crisp-dsh-fallback-title {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+}
+
+.crisp-dsh-fallback-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+
+/* Command Box */
+.crisp-dsh-code-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: color-mix(in srgb, var(--background-primary) 80%, transparent);
+  border: 1px solid var(--crisp-dsh-border);
+  border-radius: 8px;
+  padding: 6px 8px 6px 10px;
+  margin-bottom: 16px;
+  gap: 6px;
+  text-align: left;
+}
+
+.crisp-dsh-code-text {
+  font-family: var(--font-monospace);
+  font-size: 10.5px;
+  color: #4D6BFE;
+  word-break: break-all;
+  user-select: all;
+}
+
+.crisp-dsh-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--background-secondary) 80%, transparent);
+  border: 1px solid var(--crisp-dsh-border);
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.crisp-dsh-copy-btn:hover {
+  color: var(--text-normal);
+  border-color: #4D6BFE;
+}
+
+.crisp-dsh-copy-btn svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Card Action Buttons */
+.crisp-dsh-fallback-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crisp-dsh-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 550;
+  background-color: #4D6BFE;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+.crisp-dsh-btn-primary:hover {
+  opacity: 0.92;
+}
+
+.crisp-dsh-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.crisp-dsh-btn-primary svg {
+  width: 12px;
+  height: 12px;
+}
+
+.crisp-dsh-btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  background: color-mix(in srgb, var(--background-secondary) 60%, transparent);
+  color: var(--text-muted);
+  border: 1px solid var(--crisp-dsh-border);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.crisp-dsh-btn-secondary:hover {
+  background: color-mix(in srgb, var(--background-secondary) 90%, transparent);
+  color: var(--text-normal);
+}
+
+.crisp-dsh-btn-secondary svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Loading Spinner */
+.crisp-dsh-loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: crispDshSpin 0.8s linear infinite;
+}
+
+@keyframes crispDshSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Settings UI - Crisp Card Styles */
+.crisp-dsh-setting-card {
+  border: 1px solid var(--crisp-dsh-border);
+  border-radius: 12px;
+  background: var(--crisp-dsh-surface);
+  margin-bottom: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px color-mix(in srgb, black 4%, transparent);
+}
+
+.crisp-dsh-setting-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 15px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.crisp-dsh-setting-card__header::-webkit-details-marker {
+  display: none;
+}
+
+.crisp-dsh-setting-card__title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-normal);
+}
+
+.crisp-dsh-setting-card__desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.crisp-dsh-setting-card__content {
+  padding: 0 15px 12px 15px;
+  border-top: 1px solid var(--crisp-dsh-border);
+}
