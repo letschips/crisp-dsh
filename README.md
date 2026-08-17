@@ -11,8 +11,8 @@ Part of the **Crisp Series** for Obsidian by [letschips](https://github.com/lets
 - **🐳 Native Right Sidebar Workspace**: Seamlessly embeds DeepSeek Harness Web interface (`http://127.0.0.1:3080`) directly into Obsidian's right sidebar.
 - **⚡ Smart Hover Navigation Rail**: Automatically tucks away the internal left icon rail to give 100% full width to your chat and input box. Hovering near the left edge smoothly reveals the navigation drawer.
 - **✍️ Editor Context Menu Prompt**: Select any text in your markdown note, right-click `在 Crisp DSH 中向 Agent 提问` to package the note title, path, and selection into your clipboard and open DSH instantly.
-- **📥 One-Click Markdown Export**: Click `📥` in the top capsule toolbar to snapshot your agent research session directly into your Obsidian vault as a structured Markdown note with frontmatter metadata.
-- **🔋 Smart Background Battery Saver**: Automatically suspends background health probes when the sidebar is folded or switched to other tabs, preserving MacBook battery life with zero CPU overhead.
+- **📥 Real Session Export**: Click `📥` to read the most recently updated nonblank DSH session for this vault through DSH's local Session API, then export only real user/Agent text to a structured Markdown research note. Clipboard contents are never used.
+- **🔋 True Background Suspension**: When the sidebar is hidden or Obsidian is backgrounded, the plugin stops health probes and unloads the iframe; it restores the exact DSH URL when the view returns.
 - **🟢 Live Status & Latency Pill**: Real-time status badge monitoring `http://127.0.0.1:3080` with response latency and offline recovery card.
 - **🎨 Crisp Frosted Glass Card**: Crafted with 14px smooth squircle corners, ambient light gradient, capsule action buttons, and full dark/light theme adaptability.
 - **🛡️ 100% Free & Local-First**: Completely free to use with no license activation required. All communication runs strictly on your local device (`127.0.0.1`).
@@ -65,7 +65,7 @@ By default, the web interface will be accessible at `http://127.0.0.1:3080`.
 | **Sidebar Mode** | `Auto-Hide (Hover)` / `Manual Toggle` / `Always Show` | `Auto-Hide` |
 | **Sidebar Offset** | Internal icon sidebar width compensation | `52px` |
 | **Zoom Level** | Interface scaling (85% ~ 105%) | `100%` |
-| **Export Folder** | Vault folder path for one-click note export | `Crisp DSH Outputs` |
+| **Export Folder** | Vault folder path for real-session export | `Topics/self-media/research/content-projects/dsh-explorations` |
 | **Smart Battery Saver** | Suspend health probes when tab is hidden | `Enabled` |
 | **Auto Check Interval** | Background heartbeat probe frequency | `15s` |
 | **Auto Open on Start** | Automatically open DSH sidebar on vault load | `Disabled` |

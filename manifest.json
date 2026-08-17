@@ -1,7 +1,7 @@
 {
   "id": "crisp-dsh",
   "name": "Crisp DSH",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.0.0",
   "description": "Embed DeepSeek Harness (dsh) directly into the Obsidian right sidebar with live status monitoring, auto-reconnect, and quick context actions.",
   "author": "letschips",

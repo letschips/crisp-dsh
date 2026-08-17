@@ -9,6 +9,9 @@ const { Plugin, ItemView, PluginSettingTab, Setting, Notice, requestUrl, normali
 
 const VIEW_TYPE_CRISP_DSH = "crisp-dsh-view";
 
+const LEGACY_EXPORT_FOLDER = "Topics/self-media/research/content-projects";
+const DEFAULT_EXPORT_FOLDER = "Topics/self-media/research/content-projects/dsh-explorations";
+
 const DEFAULT_SETTINGS = {
   serverUrl: "http://127.0.0.1:3080",
   sidebarMode: "auto-hover",  // 'auto-hover' (自动隐藏·悬停滑出) | 'manual' (手动点击切换) | 'always' (始终显示)
@@ -17,7 +20,7 @@ const DEFAULT_SETTINGS = {
   autoCheck: true,
   checkInterval: 15,
   smartSuspension: true,      // 智能后台休眠，Tab隐藏时停止轮询保护续航
-  exportFolder: "Crisp DSH Outputs",
+  exportFolder: DEFAULT_EXPORT_FOLDER,
   launchCommand: "npx @deepseek-ai/dsh web",
   autoOpenOnStart: false,
   subtitleText: "让智能体在笔记中协同探索"
@@ -35,6 +38,121 @@ const ICONS = {
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
   context: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`
 };
+
+function dshRpcId() {
+  return `crisp-dsh-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeServerUrl(rawUrl) {
+  const value = (rawUrl || "").trim();
+  if (!value) return "";
+  return value.startsWith("http://") || value.startsWith("https://") ? value : `http://${value}`;
+}
+
+function sessionTitle(session) {
+  return session.title
+    || session.projections?.values?.title
+    || "未命名 DSH 会话";
+}
+
+function selectExportableSession(sessions, vaultPath) {
+  const completed = (sessions || []).filter((session) => !session.blank);
+  const candidates = vaultPath
+    ? completed.filter((session) => session.cwd === vaultPath)
+    : completed;
+  return candidates
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || null;
+}
+
+function textFromBlocks(blocks) {
+  return (blocks || [])
+    .filter((block) => block && block.type === "text" && typeof block.text === "string")
+    .map((block) => block.text.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function formatSessionTranscript(entries) {
+  const messages = [];
+  for (const entry of entries || []) {
+    const event = entry?.event || entry;
+    if (!event?.data) continue;
+
+    if (event.type === "user/message" && event.data.source?.kind === "user") {
+      const text = textFromBlocks(event.data.content);
+      if (text) messages.push(`## 用户\n\n${text}`);
+    }
+
+    if (event.type === "assistant/message") {
+      const text = textFromBlocks(event.data.message?.content || event.data.content);
+      if (text) messages.push(`## Agent\n\n${text}`);
+    }
+  }
+  return messages.join("\n\n---\n\n");
+}
+
+function utcTimestamp(date) {
+  const pad = (number) => String(number).padStart(2, "0");
+  return `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}`;
+}
+
+function yamlString(value) {
+  return JSON.stringify(String(value || ""));
+}
+
+function buildResearchNote({ session, transcript, serverUrl, createdAt }) {
+  const timestamp = utcTimestamp(createdAt);
+  const title = sessionTitle(session);
+  const stableId = `RES-dsh-${session.sessionId}-${timestamp}`;
+  return `---
+id: ${yamlString(stableId)}
+type: research
+topic: self-media
+owner: topic:self-media
+status: active
+research_type: content-project
+project: dsh-explorations
+source: deepseek-harness
+source_url: ${yamlString(serverUrl)}
+session_id: ${yamlString(session.sessionId)}
+session_title: ${yamlString(title)}
+created_at: ${yamlString(createdAt.toISOString())}
+routing_confidence: 1.0
+routing_reason: "Crisp DSH 导出的真实会话"
+tags:
+  - deepseek
+  - research
+  - ai-harness
+---
+
+# ${title}
+
+> DSH 会话 ID：\`${session.sessionId}\`<br>
+> 导出时间：${createdAt.toLocaleString()}<br>
+> 来源：${serverUrl}
+
+## 会话实录
+
+${transcript}
+
+## 沉淀总结与后续动作
+
+- [ ] 提炼核心观点融入知识库
+- [ ] 转化为正式输出内容
+`;
+}
+
+function suspendIframeElement(iframeEl) {
+  const currentSrc = iframeEl?.getAttribute("src") || "";
+  if (!currentSrc || currentSrc === "about:blank") return null;
+  iframeEl.src = "about:blank";
+  return currentSrc;
+}
+
+function resumeIframeElement(iframeEl, src) {
+  if (!iframeEl || !src) return;
+  iframeEl.src = src;
+}
 
 /* ==========================================================================
    Crisp DSH View (Right Sidebar Leaf)
@@ -58,6 +176,8 @@ class CrispDshView extends ItemView {
     this.isManualOpen = false;
     this.isHoverExpanded = false;
     this.isSuspended = false;
+    this.isViewVisible = true;
+    this.suspendedIframeSrc = null;
     this.intersectionObserver = null;
   }
 
@@ -111,30 +231,58 @@ class CrispDshView extends ItemView {
     try {
       this.intersectionObserver = new IntersectionObserver((entries) => {
         for (const entry of entries) {
+          this.isViewVisible = entry.isIntersecting;
           if (!entry.isIntersecting) {
-            // Leaf is hidden / folded / background tab -> Suspend polling to save battery
-            this.isSuspended = true;
-            this.stopAutoCheck();
+            this.suspendBackgroundWork();
           } else {
-            // Leaf is visible again -> Wake up immediately
-            if (this.isSuspended) {
-              this.isSuspended = false;
-              this.checkConnection(true);
-              this.startAutoCheck();
-            }
+            this.resumeBackgroundWork();
           }
         }
       }, { threshold: 0.05 });
 
       this.intersectionObserver.observe(this.contentEl);
+      this.registerDomEvent(document, "visibilitychange", () => {
+        if (document.hidden) {
+          this.suspendBackgroundWork();
+        } else if (this.isViewVisible) {
+          this.resumeBackgroundWork();
+        }
+      });
     } catch (e) {
       // Fallback
     }
   }
 
+  suspendBackgroundWork() {
+    if (this.isSuspended) return;
+    this.isSuspended = true;
+    this.stopAutoCheck();
+    this.suspendIframe();
+  }
+
+  resumeBackgroundWork() {
+    if (!this.isSuspended) return;
+    this.isSuspended = false;
+    this.resumeIframe();
+    this.checkConnection(true);
+    this.startAutoCheck();
+  }
+
+  suspendIframe() {
+    if (!this.iframeEl || this.suspendedIframeSrc) return;
+    this.suspendedIframeSrc = suspendIframeElement(this.iframeEl);
+  }
+
+  resumeIframe() {
+    if (!this.iframeEl || !this.suspendedIframeSrc) return;
+    const src = this.suspendedIframeSrc;
+    this.suspendedIframeSrc = null;
+    resumeIframeElement(this.iframeEl, src);
+  }
+
   setupNativeHeaderActions() {
     this.addAction("panel-left", "折叠/展开 DSH 内部侧边栏", () => this.toggleSidebar());
-    this.addAction("save", "一键保存当前会话为 Markdown 笔记", () => this.plugin.saveChatToVault());
+    this.addAction("save", "导出最近的 DSH 会话为 Markdown 笔记", () => this.plugin.saveChatToVault());
     this.addAction("refresh-cw", "刷新 DeepSeek Harness", () => this.reload());
     this.addAction("file-text", "复制当前笔记上下文供 Agent 使用", () => this.plugin.copyActiveNoteContext());
     this.addAction("external-link", "在外部浏览器中打开", () => this.plugin.openInBrowser());
@@ -185,7 +333,7 @@ class CrispDshView extends ItemView {
     createBtn(ICONS.context, "复制当前笔记上下文", () => this.plugin.copyActiveNoteContext());
 
     // Action 3: Save Chat to Vault
-    createBtn(ICONS.save, "一键保存探索记录为 Markdown 笔记", () => this.plugin.saveChatToVault());
+    createBtn(ICONS.save, "导出最近的 DSH 会话为 Markdown 笔记", () => this.plugin.saveChatToVault());
 
     // Action 4: Refresh
     createBtn(ICONS.refresh, "刷新 DeepSeek Harness", () => this.reload());
@@ -442,6 +590,10 @@ class CrispDshView extends ItemView {
 
   ensureLoaded(url) {
     if (!this.iframeEl) return;
+    if (this.isSuspended) {
+      this.suspendedIframeSrc = url;
+      return;
+    }
     try {
       const currentSrc = this.iframeEl.getAttribute("src") || "";
       if (!currentSrc || currentSrc === "about:blank" || !currentSrc.startsWith(url)) {
@@ -463,7 +615,11 @@ class CrispDshView extends ItemView {
       const cacheBustUrl = url.includes("?") 
         ? `${url}&_t=${Date.now()}` 
         : `${url}?_t=${Date.now()}`;
-      this.iframeEl.src = cacheBustUrl;
+      if (this.isSuspended) {
+        this.suspendedIframeSrc = cacheBustUrl;
+      } else {
+        this.iframeEl.src = cacheBustUrl;
+      }
     }
     this.checkConnection(false);
     new Notice("已刷新 DeepSeek Harness");
@@ -587,7 +743,7 @@ class CrispDshSettingTab extends PluginSettingTab {
 
     new Setting(expContent)
       .setName("导出笔记保存目录")
-      .setDesc("点击顶部「📥 存为笔记」时自动保存文件的 Vault 相对路径")
+      .setDesc("导出真实 DSH 会话时自动保存文件的 Vault 相对路径")
       .addText((text) =>
         text
           .setPlaceholder("Crisp DSH Outputs")
@@ -759,7 +915,7 @@ module.exports = class CrispDshPlugin extends Plugin {
 
     this.addCommand({
       id: "save-dsh-chat-to-note",
-      name: "保存当前 DSH 探索记录为 Markdown 笔记",
+      name: "导出最近的 DSH 会话为 Markdown 笔记",
       callback: () => this.saveChatToVault()
     });
 
@@ -800,7 +956,12 @@ module.exports = class CrispDshPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const savedSettings = await this.loadData();
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, savedSettings);
+    if (savedSettings?.exportFolder === LEGACY_EXPORT_FOLDER) {
+      this.settings.exportFolder = DEFAULT_EXPORT_FOLDER;
+      await this.saveSettings();
+    }
   }
 
   async saveSettings() {
@@ -901,70 +1062,48 @@ module.exports = class CrispDshPlugin extends Plugin {
 
   async saveChatToVault() {
     try {
+      const sessions = await this.listDshSessions();
+      const vaultPath = this.app.vault.adapter.getBasePath?.() || "";
+      const session = selectExportableSession(sessions, vaultPath);
+      if (!session) {
+        new Notice("没有可导出的 DSH 会话；请先在 DSH 中完成一次对话");
+        return;
+      }
+
+      const transcript = await this.readDshSessionTranscript(session.sessionId);
+      if (!transcript) {
+        new Notice("该 DSH 会话没有可导出的用户或 Agent 文本");
+        return;
+      }
+
       const now = new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-      const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-      const timestampTag = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
-
-      let rawFolder = this.settings.exportFolder || "Crisp DSH Outputs";
-      const folderPath = normalizePath(rawFolder.trim());
-
-      // Safe recursive directory creation
+      const folderPath = normalizePath((this.settings.exportFolder || DEFAULT_EXPORT_FOLDER).trim());
       await this.ensureFolderExists(folderPath);
 
-      // Read clipboard content if available
-      let clipboardText = "";
-      try {
-        clipboardText = await navigator.clipboard.readText();
-      } catch (e) {}
-
-      // Unique file naming to avoid overwrite collisions
-      let noteFileName = `DSH-探索记录-${timestampTag}.md`;
+      const safeTitle = sessionTitle(session)
+        .replace(/[\\/:*?"<>|]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 60) || "未命名会话";
+      const timestampTag = utcTimestamp(now);
+      let noteFileName = `DSH-${safeTitle}-${timestampTag}.md`;
       let fullPath = normalizePath(`${folderPath}/${noteFileName}`);
       let counter = 1;
       while (await this.app.vault.adapter.exists(fullPath)) {
-        noteFileName = `DSH-探索记录-${timestampTag}-${counter}.md`;
+        noteFileName = `DSH-${safeTitle}-${timestampTag}-${counter}.md`;
         fullPath = normalizePath(`${folderPath}/${noteFileName}`);
         counter++;
       }
 
-      const noteContent = `---
-type: research
-topic: ai-research
-research_type: content-project
-source: deepseek-harness
-source_url: "${this.settings.serverUrl}"
-created_at: "${dateStr} ${timeStr}"
-status: to-research
-tags:
-  - deepseek
-  - research
-  - ai-harness
----
-
-# DeepSeek Harness 探索记录
-
-> 📅 **记录时间**: ${dateStr} ${timeStr}  
-> 🤖 **智能体引擎**: DeepSeek Harness (${this.settings.serverUrl})  
-> 🏷️ **归档分类**: ${folderPath}
-
----
-
-## 📌 探索与会话内容
-
-${clipboardText ? clipboardText : "*(在此粘贴或记录 DSH 探索产出的核心提纲、代码或洞察)*"}
-
----
-
-## 💡 沉淀总结与后续动作
-
-- [ ] 提炼核心观点融入知识库
-- [ ] 转化为正式输出内容
-`;
+      const noteContent = buildResearchNote({
+        session,
+        transcript,
+        serverUrl: this.settings.serverUrl,
+        createdAt: now
+      });
 
       const newFile = await this.app.vault.create(fullPath, noteContent);
-      new Notice(`已成功创建探索记录笔记：${noteFileName}`);
+      new Notice(`已导出 DSH 会话「${sessionTitle(session)}」：${noteFileName}`);
 
       // Open new file in workspace leaf
       const leaf = this.app.workspace.getLeaf(false);
@@ -976,4 +1115,45 @@ ${clipboardText ? clipboardText : "*(在此粘贴或记录 DSH 探索产出的�
       new Notice(`保存笔记失败: ${error.message}`);
     }
   }
+
+  async dshRpc(method, payload) {
+    const baseUrl = normalizeServerUrl(this.settings.serverUrl).replace(/\/$/, "");
+    if (!baseUrl) throw new Error("未配置 DSH 服务地址");
+
+    const response = await requestUrl({
+      url: `${baseUrl}/api/${method}`,
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "client-request",
+        rpcId: dshRpcId(),
+        method,
+        payload
+      }),
+      throw: false
+    });
+    const result = response?.json?.result;
+    if (!result?.ok) {
+      throw new Error(result?.error?.message || `DSH ${method} 请求失败`);
+    }
+    return result.value;
+  }
+
+  async listDshSessions() {
+    const value = await this.dshRpc("session.list", {});
+    return value.items || [];
+  }
+
+  async readDshSessionTranscript(sessionId) {
+    const value = await this.dshRpc("session.history", { sessionId, maxMessages: 500 });
+    return formatSessionTranscript(value.events || []);
+  }
+};
+
+module.exports.__test = {
+  selectExportableSession,
+  formatSessionTranscript,
+  buildResearchNote,
+  suspendIframeElement,
+  resumeIframeElement
 };
