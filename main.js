@@ -5,15 +5,19 @@
    ========================================================================== */
 
 var obsidian = require("obsidian");
-const { Plugin, ItemView, PluginSettingTab, Setting, Notice, requestUrl, normalizePath } = obsidian;
+const { Plugin, ItemView, PluginSettingTab, FuzzySuggestModal, Menu, Setting, Notice, requestUrl, normalizePath } = obsidian;
 
 const VIEW_TYPE_CRISP_DSH = "crisp-dsh-view";
+const TRANSCRIPT_START = "<!-- CRISP-DSH:TRANSCRIPT:START -->";
+const TRANSCRIPT_END = "<!-- CRISP-DSH:TRANSCRIPT:END -->";
+const DEEP_SUSPEND_DELAY_MS = 5 * 60 * 1000;
 
 const LEGACY_EXPORT_FOLDER = "Topics/self-media/research/content-projects";
 const DEFAULT_EXPORT_FOLDER = "Topics/self-media/research/content-projects/dsh-explorations";
 
 const DEFAULT_SETTINGS = {
   serverUrl: "http://127.0.0.1:3080",
+  allowRemoteServer: false,
   sidebarMode: "auto-hover",  // 'auto-hover' (自动隐藏·悬停滑出) | 'manual' (手动点击切换) | 'always' (始终显示)
   sidebarOffset: 52,          // px
   zoomLevel: 100,             // 85, 90, 95, 100, 105 (%)
@@ -36,7 +40,8 @@ const ICONS = {
   copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`,
   save: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  context: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`
+  context: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`,
+  more: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></svg>`
 };
 
 function dshRpcId() {
@@ -49,19 +54,59 @@ function normalizeServerUrl(rawUrl) {
   return value.startsWith("http://") || value.startsWith("https://") ? value : `http://${value}`;
 }
 
+function isLoopbackHostname(hostname) {
+  const value = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+  return value === "localhost"
+    || value.endsWith(".localhost")
+    || value === "::1"
+    || /^127(?:\.\d{1,3}){3}$/.test(value);
+}
+
+function normalizeAllowedServerUrl(rawUrl, allowRemoteServer = false) {
+  const normalized = normalizeServerUrl(rawUrl);
+  if (!normalized) throw new Error("未配置 DSH 服务地址");
+
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch (error) {
+    throw new Error("DSH 服务地址格式无效");
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error("DSH 服务地址仅支持 HTTP 或 HTTPS");
+  }
+  if (!allowRemoteServer && !isLoopbackHostname(parsed.hostname)) {
+    throw new Error("默认仅允许本机 DSH 服务；如需远程连接，请先启用远程地址选项");
+  }
+  return parsed.href;
+}
+
 function sessionTitle(session) {
   return session.title
     || session.projections?.values?.title
     || "未命名 DSH 会话";
 }
 
-function selectExportableSession(sessions, vaultPath) {
+function normalizedWorkingDirectory(value) {
+  return String(value || "")
+    .replace(/\\/g, "/")
+    .replace(/\/+$/, "");
+}
+
+function listExportableSessions(sessions, vaultPath) {
   const completed = (sessions || []).filter((session) => !session.blank);
+  const normalizedVaultPath = normalizedWorkingDirectory(vaultPath);
   const candidates = vaultPath
-    ? completed.filter((session) => session.cwd === vaultPath)
+    ? completed.filter(
+      (session) => normalizedWorkingDirectory(session.cwd) === normalizedVaultPath
+    )
     : completed;
-  return candidates
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || null;
+  return candidates.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+function selectExportableSession(sessions, vaultPath) {
+  return listExportableSessions(sessions, vaultPath)[0] || null;
 }
 
 function textFromBlocks(blocks) {
@@ -101,9 +146,8 @@ function yamlString(value) {
 }
 
 function buildResearchNote({ session, transcript, serverUrl, createdAt }) {
-  const timestamp = utcTimestamp(createdAt);
   const title = sessionTitle(session);
-  const stableId = `RES-dsh-${session.sessionId}-${timestamp}`;
+  const stableId = `RES-dsh-${session.sessionId}`;
   return `---
 id: ${yamlString(stableId)}
 type: research
@@ -117,6 +161,7 @@ source_url: ${yamlString(serverUrl)}
 session_id: ${yamlString(session.sessionId)}
 session_title: ${yamlString(title)}
 created_at: ${yamlString(createdAt.toISOString())}
+exported_at: ${yamlString(createdAt.toISOString())}
 routing_confidence: 1.0
 routing_reason: "Crisp DSH 导出的真实会话"
 tags:
@@ -131,15 +176,50 @@ tags:
 > 导出时间：${createdAt.toLocaleString()}<br>
 > 来源：${serverUrl}
 
+${TRANSCRIPT_START}
 ## 会话实录
 
 ${transcript}
+${TRANSCRIPT_END}
 
 ## 沉淀总结与后续动作
 
 - [ ] 提炼核心观点融入知识库
 - [ ] 转化为正式输出内容
 `;
+}
+
+function updateManagedResearchNote(existingContent, transcript, exportedAt) {
+  const startIndex = existingContent.indexOf(TRANSCRIPT_START);
+  const endIndex = existingContent.indexOf(TRANSCRIPT_END);
+  if (startIndex < 0 || endIndex < startIndex) {
+    throw new Error("现有导出笔记没有可安全更新的会话区块");
+  }
+
+  const managedBlock = `${TRANSCRIPT_START}\n## 会话实录\n\n${transcript}\n${TRANSCRIPT_END}`;
+  const before = existingContent.slice(0, startIndex);
+  const after = existingContent.slice(endIndex + TRANSCRIPT_END.length);
+  let updated = `${before}${managedBlock}${after}`;
+  const exportedAtLine = `exported_at: ${yamlString(exportedAt.toISOString())}`;
+  if (/^exported_at:.*$/m.test(updated)) {
+    updated = updated.replace(/^exported_at:.*$/m, exportedAtLine);
+  } else {
+    updated = updated.replace(/^created_at:.*$/m, (line) => `${line}\n${exportedAtLine}`);
+  }
+  return updated;
+}
+
+function extractExportedSessionId(content) {
+  const frontmatter = String(content || "").match(/^---\s*\n([\s\S]*?)\n---(?:\n|$)/);
+  if (!frontmatter) return "";
+  const sessionLine = frontmatter[1].match(/^session_id:\s*(.+?)\s*$/m);
+  if (!sessionLine) return "";
+  const rawValue = sessionLine[1];
+  try {
+    return String(JSON.parse(rawValue));
+  } catch (error) {
+    return rawValue.replace(/^['"]|['"]$/g, "");
+  }
 }
 
 function suspendIframeElement(iframeEl) {
@@ -152,6 +232,81 @@ function suspendIframeElement(iframeEl) {
 function resumeIframeElement(iframeEl, src) {
   if (!iframeEl || !src) return;
   iframeEl.src = src;
+}
+
+class DelayedIframeSuspension {
+  constructor({ delayMs, setTimer, clearTimer, onSuspend }) {
+    this.delayMs = delayMs;
+    this.setTimer = setTimer;
+    this.clearTimer = clearTimer;
+    this.onSuspend = onSuspend;
+    this.timerId = null;
+    this.generation = 0;
+  }
+
+  schedule() {
+    this.cancel();
+    const generation = this.generation;
+    this.timerId = this.setTimer(() => {
+      if (generation !== this.generation) return;
+      this.timerId = null;
+      this.onSuspend();
+    }, this.delayMs);
+  }
+
+  cancel() {
+    this.generation += 1;
+    if (this.timerId !== null) {
+      this.clearTimer(this.timerId);
+      this.timerId = null;
+    }
+  }
+}
+
+class DshSessionSuggestModal extends FuzzySuggestModal {
+  constructor(app, sessions) {
+    super(app);
+    this.sessions = sessions;
+    this.setPlaceholder("选择要导出的 DSH 会话");
+    this.setInstructions([
+      { command: "↑↓", purpose: "选择" },
+      { command: "↵", purpose: "确认导出" },
+      { command: "esc", purpose: "取消" }
+    ]);
+    this.settled = false;
+    this.selection = new Promise((resolve) => {
+      this.resolveSelection = resolve;
+    });
+  }
+
+  getItems() {
+    return this.sessions;
+  }
+
+  getItemText(session) {
+    const updatedAt = session.updatedAt
+      ? new Date(session.updatedAt).toLocaleString()
+      : "时间未知";
+    return `${sessionTitle(session)} · ${updatedAt}`;
+  }
+
+  onChooseItem(session) {
+    this.settled = true;
+    this.resolveSelection(session);
+  }
+
+  onClose() {
+    super.onClose();
+    if (!this.settled) {
+      this.settled = true;
+      this.resolveSelection(null);
+    }
+  }
+
+  async choose() {
+    this.open();
+    return this.selection;
+  }
 }
 
 /* ==========================================================================
@@ -173,12 +328,25 @@ class CrispDshView extends ItemView {
     this.iframeEl = null;
     this.fallbackEl = null;
     this.sidebarToggleBtn = null;
+    this.overflowBtn = null;
     this.isManualOpen = false;
     this.isHoverExpanded = false;
     this.isSuspended = false;
+    this.isBackgroundPaused = false;
     this.isViewVisible = true;
     this.suspendedIframeSrc = null;
     this.intersectionObserver = null;
+    this.visibilityHandlerRegistered = false;
+    this.deepSuspension = new DelayedIframeSuspension({
+      delayMs: DEEP_SUSPEND_DELAY_MS,
+      setTimer: (callback, delay) => window.setTimeout(callback, delay),
+      clearTimer: (timerId) => window.clearTimeout(timerId),
+      onSuspend: () => {
+        if (!this.isBackgroundPaused || !this.plugin.settings.smartSuspension) return;
+        this.isSuspended = true;
+        this.suspendIframe();
+      }
+    });
   }
 
   getViewType() {
@@ -220,6 +388,7 @@ class CrispDshView extends ItemView {
 
   async onClose() {
     this.stopAutoCheck();
+    this.deepSuspension.cancel();
     if (this.intersectionObserver) {
       this.intersectionObserver.disconnect();
       this.intersectionObserver = null;
@@ -227,7 +396,32 @@ class CrispDshView extends ItemView {
   }
 
   setupSmartSuspension() {
-    if (!this.plugin.settings.smartSuspension) return;
+    if (!this.visibilityHandlerRegistered) {
+      this.visibilityHandlerRegistered = true;
+      this.registerDomEvent(document, "visibilitychange", () => {
+        if (!this.plugin.settings.smartSuspension) return;
+        if (document.hidden) {
+          this.suspendBackgroundWork();
+        } else if (this.isViewVisible) {
+          this.resumeBackgroundWork();
+        }
+      });
+    }
+    this.updateSmartSuspension();
+  }
+
+  updateSmartSuspension() {
+    if (!this.plugin.settings.smartSuspension) {
+      if (this.intersectionObserver) {
+        this.intersectionObserver.disconnect();
+        this.intersectionObserver = null;
+      }
+      this.isViewVisible = true;
+      this.resumeBackgroundWork();
+      return;
+    }
+    if (this.intersectionObserver) return;
+
     try {
       this.intersectionObserver = new IntersectionObserver((entries) => {
         for (const entry of entries) {
@@ -241,30 +435,27 @@ class CrispDshView extends ItemView {
       }, { threshold: 0.05 });
 
       this.intersectionObserver.observe(this.contentEl);
-      this.registerDomEvent(document, "visibilitychange", () => {
-        if (document.hidden) {
-          this.suspendBackgroundWork();
-        } else if (this.isViewVisible) {
-          this.resumeBackgroundWork();
-        }
-      });
+      if (document.hidden) this.suspendBackgroundWork();
     } catch (e) {
       // Fallback
     }
   }
 
   suspendBackgroundWork() {
-    if (this.isSuspended) return;
-    this.isSuspended = true;
+    if (!this.plugin.settings.smartSuspension || this.isBackgroundPaused) return;
+    this.isBackgroundPaused = true;
     this.stopAutoCheck();
-    this.suspendIframe();
+    this.deepSuspension.schedule();
   }
 
   resumeBackgroundWork() {
-    if (!this.isSuspended) return;
+    const wasPaused = this.isBackgroundPaused;
+    const wasSuspended = this.isSuspended;
+    this.isBackgroundPaused = false;
+    this.deepSuspension.cancel();
     this.isSuspended = false;
-    this.resumeIframe();
-    this.checkConnection(true);
+    if (wasSuspended) this.resumeIframe();
+    if (wasPaused || wasSuspended) this.checkConnection(true);
     this.startAutoCheck();
   }
 
@@ -308,11 +499,13 @@ class CrispDshView extends ItemView {
     const actions = headerRight.createDiv({ cls: "crisp-dsh-header-actions" });
 
     // Helper to create accessible action buttons
-    const createBtn = (iconSvg, label, onClick, isActive = false) => {
+    const createBtn = (iconSvg, label, onClick, className, isActive = false) => {
       const btn = actions.createEl("button", {
-        cls: `crisp-dsh-action-btn${isActive ? " is-active" : ""}`,
+        cls: `crisp-dsh-action-btn ${className}${isActive ? " is-active" : ""}`,
         attr: {
+          type: "button",
           "aria-label": label,
+          title: label,
           "data-tooltip-position": "bottom"
         }
       });
@@ -326,29 +519,67 @@ class CrispDshView extends ItemView {
       ICONS.sidebar,
       "切换 DSH 内部侧边栏 (满宽/展开)",
       () => this.toggleSidebar(),
+      "is-sidebar",
       this.isManualOpen
     );
+    this.sidebarToggleBtn.setAttribute("aria-pressed", String(this.isManualOpen));
 
     // Action 2: Copy Context
-    createBtn(ICONS.context, "复制当前笔记上下文", () => this.plugin.copyActiveNoteContext());
+    createBtn(ICONS.context, "复制当前笔记上下文", () => this.plugin.copyActiveNoteContext(), "is-context");
 
     // Action 3: Save Chat to Vault
-    createBtn(ICONS.save, "导出最近的 DSH 会话为 Markdown 笔记", () => this.plugin.saveChatToVault());
+    createBtn(ICONS.save, "导出最近的 DSH 会话为 Markdown 笔记", () => this.plugin.saveChatToVault(), "is-save");
 
     // Action 4: Refresh
-    createBtn(ICONS.refresh, "刷新 DeepSeek Harness", () => this.reload());
+    createBtn(ICONS.refresh, "刷新 DeepSeek Harness", () => this.reload(), "is-refresh");
 
     // Action 5: External Browser
-    createBtn(ICONS.external, "在默认浏览器中打开", () => this.plugin.openInBrowser());
+    createBtn(ICONS.external, "在默认浏览器中打开", () => this.plugin.openInBrowser(), "is-external");
 
     // Action 6: Settings
-    createBtn(ICONS.settings, "Crisp DSH 设置", () => this.plugin.openSettingsTab());
+    createBtn(ICONS.settings, "Crisp DSH 设置", () => this.plugin.openSettingsTab(), "is-settings");
+
+    // Narrow sidebars retain the primary action and collapse secondary actions into a native menu.
+    this.overflowBtn = createBtn(
+      ICONS.more,
+      "更多 DSH 操作",
+      (event) => this.openOverflowMenu(event),
+      "is-overflow"
+    );
 
     // Status Pill
-    this.statusEl = headerRight.createDiv({ cls: "crisp-dsh-status is-connecting" });
+    this.statusEl = headerRight.createEl("button", {
+      cls: "crisp-dsh-status is-connecting",
+      attr: {
+        type: "button",
+        "aria-live": "polite",
+        "aria-label": "DSH 正在连接，按下可重试"
+      }
+    });
     this.statusEl.createDiv({ cls: "crisp-dsh-status-dot" });
     this.statusTextEl = this.statusEl.createSpan({ text: "连接中..." });
     this.statusEl.addEventListener("click", () => this.checkConnection(false));
+  }
+
+  openOverflowMenu(event) {
+    const menu = new Menu();
+    const addItem = (icon, title, onClick) => {
+      menu.addItem((item) => item.setIcon(icon).setTitle(title).onClick(onClick));
+    };
+    addItem("file-text", "复制当前笔记上下文", () => this.plugin.copyActiveNoteContext());
+    addItem("save", "导出 DSH 会话", () => this.plugin.saveChatToVault());
+    addItem("refresh-cw", "刷新 DeepSeek Harness", () => this.reload());
+    addItem("external-link", "在默认浏览器中打开", () => this.plugin.openInBrowser());
+    menu.addSeparator();
+    addItem("settings", "Crisp DSH 设置", () => this.plugin.openSettingsTab());
+
+    const target = event?.currentTarget || this.overflowBtn;
+    const rect = target?.getBoundingClientRect?.();
+    if (rect) {
+      menu.showAtPosition({ x: rect.right, y: rect.bottom });
+    } else {
+      menu.showAtMouseEvent(event);
+    }
   }
 
   buildMainCard(container) {
@@ -358,7 +589,10 @@ class CrispDshView extends ItemView {
     this.applySidebarMode();
 
     // Hover trigger strip with glowing handle
-    const hoverZone = this.viewportEl.createDiv({ cls: "crisp-dsh-hover-zone" });
+    const hoverZone = this.viewportEl.createDiv({
+      cls: "crisp-dsh-hover-zone",
+      attr: { "aria-hidden": "true" }
+    });
     hoverZone.createDiv({ cls: "crisp-dsh-hover-handle" });
 
     // 1. Enter from left edge: Expand
@@ -397,7 +631,8 @@ class CrispDshView extends ItemView {
       cls: "crisp-dsh-iframe",
       attr: {
         src: "about:blank",
-        allow: "clipboard-read; clipboard-write; microphone; camera",
+        title: "DeepSeek Harness",
+        allow: "clipboard-read; clipboard-write",
         sandbox: "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
       }
     });
@@ -434,6 +669,11 @@ class CrispDshView extends ItemView {
 
     if (this.sidebarToggleBtn) {
       this.sidebarToggleBtn.toggleClass("is-active", this.isManualOpen);
+      this.sidebarToggleBtn.setAttribute("aria-pressed", String(this.isManualOpen));
+      this.sidebarToggleBtn.setAttribute(
+        "aria-label",
+        this.isManualOpen ? "收起 DSH 内部侧边栏" : "展开 DSH 内部侧边栏"
+      );
     }
   }
 
@@ -501,7 +741,7 @@ class CrispDshView extends ItemView {
 
   startAutoCheck() {
     this.stopAutoCheck();
-    if (!this.plugin.settings.autoCheck || this.isSuspended) return;
+    if (!this.plugin.settings.autoCheck || this.isSuspended || this.isBackgroundPaused) return;
     const intervalMs = Math.max(5, this.plugin.settings.checkInterval) * 1000;
     this.checkTimer = window.setInterval(() => {
       this.checkConnection(true);
@@ -522,9 +762,15 @@ class CrispDshView extends ItemView {
       return false;
     }
 
-    let url = rawUrl;
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = `http://${url}`;
+    let url;
+    try {
+      url = normalizeAllowedServerUrl(rawUrl, this.plugin.settings.allowRemoteServer);
+    } catch (error) {
+      this.suspendedIframeSrc = null;
+      if (this.iframeEl) this.iframeEl.src = "about:blank";
+      this.updateStatus("offline");
+      if (!silent) new Notice(error.message);
+      return false;
     }
 
     if (!silent) {
@@ -562,15 +808,18 @@ class CrispDshView extends ItemView {
       if (status === "online") {
         const port = this.extractPort(this.plugin.settings.serverUrl) || "3080";
         this.statusTextEl.setText(`${port} · 就绪`);
+        this.statusEl.setAttribute("aria-label", `DSH 服务已就绪，端口 ${port}，按下可重新检查连接`);
         this.statusEl.setAttribute(
           "title",
           `DeepSeek Harness 服务正常 · 延迟: ${this.latency !== null ? this.latency : 1}ms`
         );
       } else if (status === "offline") {
         this.statusTextEl.setText("服务离线");
+        this.statusEl.setAttribute("aria-label", "DSH 服务离线，按下可重试连接");
         this.statusEl.setAttribute("title", "未检测到本地 DSH 服务，点击重试连接");
       } else {
         this.statusTextEl.setText("连接中...");
+        this.statusEl.setAttribute("aria-label", "DSH 正在连接，按下可重试");
         this.statusEl.setAttribute("title", "正在连接 DeepSeek Harness 服务...");
       }
     }
@@ -606,9 +855,12 @@ class CrispDshView extends ItemView {
 
   reload() {
     const rawUrl = (this.plugin.settings.serverUrl || "http://127.0.0.1:3080").trim();
-    let url = rawUrl;
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = `http://${url}`;
+    let url;
+    try {
+      url = normalizeAllowedServerUrl(rawUrl, this.plugin.settings.allowRemoteServer);
+    } catch (error) {
+      new Notice(error.message);
+      return;
     }
 
     if (this.iframeEl) {
@@ -765,6 +1017,19 @@ class CrispDshSettingTab extends PluginSettingTab {
     const connContent = connCard.createDiv({ cls: "crisp-dsh-setting-card__content" });
 
     new Setting(connContent)
+      .setName("允许远程 DSH 服务")
+      .setDesc("默认关闭，仅允许 localhost、127.0.0.1 与 ::1；开启前请确认远程服务可信")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(Boolean(this.plugin.settings.allowRemoteServer))
+          .onChange(async (value) => {
+            this.plugin.settings.allowRemoteServer = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshViewStatus();
+          })
+      );
+
+    new Setting(connContent)
       .setName("服务地址 (Server URL)")
       .setDesc("DeepSeek Harness Web 运行地址，默认：http://127.0.0.1:3080")
       .addText((text) =>
@@ -772,9 +1037,12 @@ class CrispDshSettingTab extends PluginSettingTab {
           .setPlaceholder("http://127.0.0.1:3080")
           .setValue(this.plugin.settings.serverUrl)
           .onChange(async (value) => {
-            let sanitized = value.trim();
-            if (sanitized && !sanitized.startsWith("http://") && !sanitized.startsWith("https://")) {
-              sanitized = `http://${sanitized}`;
+            let sanitized;
+            try {
+              sanitized = normalizeAllowedServerUrl(value, this.plugin.settings.allowRemoteServer);
+            } catch (error) {
+              new Notice(error.message);
+              return;
             }
             this.plugin.settings.serverUrl = sanitized;
             await this.plugin.saveSettings();
@@ -784,13 +1052,15 @@ class CrispDshSettingTab extends PluginSettingTab {
 
     new Setting(connContent)
       .setName("智能后台休眠 (保护 MacBook 续航)")
-      .setDesc("当右侧栏折叠或切换到其他 Tab 时自动暂停探测，切回时秒级唤醒")
+      .setDesc("隐藏时立即停止探测，持续隐藏 5 分钟后再卸载页面，减少输入内容意外丢失")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.smartSuspension)
           .onChange(async (value) => {
             this.plugin.settings.smartSuspension = value;
             await this.plugin.saveSettings();
+            const view = this.plugin.getActiveDshView();
+            if (view) view.updateSmartSuspension();
           })
       );
 
@@ -1009,7 +1279,13 @@ module.exports = class CrispDshPlugin extends Plugin {
 
   openInBrowser() {
     const rawUrl = (this.settings.serverUrl || "http://127.0.0.1:3080").trim();
-    const url = rawUrl.startsWith("http") ? rawUrl : `http://${rawUrl}`;
+    let url;
+    try {
+      url = normalizeAllowedServerUrl(rawUrl, this.settings.allowRemoteServer);
+    } catch (error) {
+      new Notice(error.message);
+      return;
+    }
     window.open(url, "_blank");
   }
 
@@ -1060,15 +1336,47 @@ module.exports = class CrispDshPlugin extends Plugin {
     }
   }
 
+  async chooseDshSession(sessions) {
+    const modal = new DshSessionSuggestModal(this.app, sessions);
+    return modal.choose();
+  }
+
+  async findExistingSessionExport(sessionId, folderPath) {
+    const normalizedFolder = normalizePath(folderPath || "").replace(/\/$/, "");
+    const folderPrefix = normalizedFolder ? `${normalizedFolder}/` : "";
+    const files = this.app.vault.getMarkdownFiles()
+      .filter((file) => !folderPrefix || file.path.startsWith(folderPrefix))
+      .sort((a, b) => (b.stat?.mtime || 0) - (a.stat?.mtime || 0));
+
+    for (const file of files) {
+      const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
+      if (String(frontmatter?.session_id || "") === String(sessionId)) {
+        return file;
+      }
+      const content = await this.app.vault.cachedRead(file);
+      if (extractExportedSessionId(content) === String(sessionId)) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  async openExportedFile(file) {
+    const leaf = this.app.workspace.getLeaf(false);
+    if (leaf) await leaf.openFile(file);
+  }
+
   async saveChatToVault() {
     try {
       const sessions = await this.listDshSessions();
       const vaultPath = this.app.vault.adapter.getBasePath?.() || "";
-      const session = selectExportableSession(sessions, vaultPath);
-      if (!session) {
+      const candidates = listExportableSessions(sessions, vaultPath);
+      if (candidates.length === 0) {
         new Notice("没有可导出的 DSH 会话；请先在 DSH 中完成一次对话");
         return;
       }
+      const session = await this.chooseDshSession(candidates);
+      if (!session) return;
 
       const transcript = await this.readDshSessionTranscript(session.sessionId);
       if (!transcript) {
@@ -1079,6 +1387,20 @@ module.exports = class CrispDshPlugin extends Plugin {
       const now = new Date();
       const folderPath = normalizePath((this.settings.exportFolder || DEFAULT_EXPORT_FOLDER).trim());
       await this.ensureFolderExists(folderPath);
+
+      const existingFile = await this.findExistingSessionExport(session.sessionId, folderPath);
+      if (existingFile) {
+        const existingContent = await this.app.vault.cachedRead(existingFile);
+        try {
+          const updatedContent = updateManagedResearchNote(existingContent, transcript, now);
+          await this.app.vault.modify(existingFile, updatedContent);
+          new Notice(`已更新 DSH 会话「${sessionTitle(session)}」的现有笔记`);
+        } catch (error) {
+          new Notice("该会话已有旧版导出笔记；为保护人工内容，已打开原文件但未覆盖");
+        }
+        await this.openExportedFile(existingFile);
+        return;
+      }
 
       const safeTitle = sessionTitle(session)
         .replace(/[\\/:*?"<>|]/g, "-")
@@ -1104,12 +1426,7 @@ module.exports = class CrispDshPlugin extends Plugin {
 
       const newFile = await this.app.vault.create(fullPath, noteContent);
       new Notice(`已导出 DSH 会话「${sessionTitle(session)}」：${noteFileName}`);
-
-      // Open new file in workspace leaf
-      const leaf = this.app.workspace.getLeaf(false);
-      if (leaf) {
-        await leaf.openFile(newFile);
-      }
+      await this.openExportedFile(newFile);
     } catch (error) {
       console.error("[Crisp DSH] 保存笔记失败:", error);
       new Notice(`保存笔记失败: ${error.message}`);
@@ -1117,8 +1434,10 @@ module.exports = class CrispDshPlugin extends Plugin {
   }
 
   async dshRpc(method, payload) {
-    const baseUrl = normalizeServerUrl(this.settings.serverUrl).replace(/\/$/, "");
-    if (!baseUrl) throw new Error("未配置 DSH 服务地址");
+    const baseUrl = normalizeAllowedServerUrl(
+      this.settings.serverUrl,
+      this.settings.allowRemoteServer
+    ).replace(/\/$/, "");
 
     const response = await requestUrl({
       url: `${baseUrl}/api/${method}`,
@@ -1151,9 +1470,15 @@ module.exports = class CrispDshPlugin extends Plugin {
 };
 
 module.exports.__test = {
+  CrispDshView,
+  normalizeAllowedServerUrl,
+  listExportableSessions,
   selectExportableSession,
   formatSessionTranscript,
   buildResearchNote,
+  updateManagedResearchNote,
+  extractExportedSessionId,
   suspendIframeElement,
-  resumeIframeElement
+  resumeIframeElement,
+  DelayedIframeSuspension
 };
