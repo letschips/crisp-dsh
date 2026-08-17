@@ -34,6 +34,8 @@
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
+  container-type: inline-size;
+  container-name: crisp-dsh;
 }
 
 /* Shell Layout */
@@ -172,6 +174,10 @@
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.crisp-dsh-action-btn.is-overflow {
+  display: none;
+}
+
 .crisp-dsh-action-btn:hover {
   color: var(--text-normal);
   background: color-mix(in srgb, var(--text-normal) 12%, transparent);
@@ -211,8 +217,56 @@
   font-weight: 550;
   white-space: nowrap;
   cursor: pointer;
+  font-family: inherit;
   box-shadow: 0 2px 8px color-mix(in srgb, black 4%, transparent);
   transition: all 0.2s ease;
+}
+
+.crisp-dsh-action-btn:focus-visible,
+.crisp-dsh-status:focus-visible,
+.crisp-dsh-copy-btn:focus-visible,
+.crisp-dsh-btn-primary:focus-visible,
+.crisp-dsh-btn-secondary:focus-visible,
+.crisp-dsh-setting-card__header:focus-visible {
+  outline: 2px solid var(--crisp-dsh-accent);
+  outline-offset: 2px;
+}
+
+@container crisp-dsh (max-width: 520px) {
+  .crisp-dsh-action-btn.is-context,
+  .crisp-dsh-action-btn.is-save,
+  .crisp-dsh-action-btn.is-refresh,
+  .crisp-dsh-action-btn.is-external,
+  .crisp-dsh-action-btn.is-settings {
+    display: none;
+  }
+
+  .crisp-dsh-action-btn.is-overflow {
+    display: inline-flex;
+  }
+}
+
+@container crisp-dsh (max-width: 390px) {
+  .crisp-dsh-identity-text p {
+    display: none;
+  }
+
+  .crisp-dsh-shell {
+    padding: 12px 10px;
+    gap: 8px;
+  }
+}
+
+@container crisp-dsh (max-width: 320px) {
+  .crisp-dsh-status {
+    width: 32px;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .crisp-dsh-status > span {
+    display: none;
+  }
 }
 
 .crisp-dsh-status:hover {
@@ -279,9 +333,7 @@
   border: 1px solid var(--crisp-dsh-border);
   border-radius: 14px;
   background: var(--crisp-dsh-surface);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 6%, transparent),
-    0 10px 30px color-mix(in srgb, black 8%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-sizing: border-box;
@@ -607,4 +659,24 @@
 .crisp-dsh-setting-card__content {
   padding: 0 15px 12px 15px;
   border-top: 1px solid var(--crisp-dsh-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crisp-dsh-view *,
+  .crisp-dsh-view *::before,
+  .crisp-dsh-view *::after,
+  .crisp-dsh-setting-card,
+  .crisp-dsh-setting-card * {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .crisp-dsh-action-btn:hover,
+  .crisp-dsh-action-btn:active,
+  .crisp-dsh-status:hover,
+  .crisp-dsh-btn-primary:active {
+    transform: none;
+  }
 }

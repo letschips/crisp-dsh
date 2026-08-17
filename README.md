@@ -11,11 +11,13 @@ Part of the **Crisp Series** for Obsidian by [letschips](https://github.com/lets
 - **🐳 Native Right Sidebar Workspace**: Seamlessly embeds DeepSeek Harness Web interface (`http://127.0.0.1:3080`) directly into Obsidian's right sidebar.
 - **⚡ Smart Hover Navigation Rail**: Automatically tucks away the internal left icon rail to give 100% full width to your chat and input box. Hovering near the left edge smoothly reveals the navigation drawer.
 - **✍️ Editor Context Menu Prompt**: Select any text in your markdown note, right-click `在 Crisp DSH 中向 Agent 提问` to package the note title, path, and selection into your clipboard and open DSH instantly.
-- **📥 Real Session Export**: Click `📥` to read the most recently updated nonblank DSH session for this vault through DSH's local Session API, then export only real user/Agent text to a structured Markdown research note. Clipboard contents are never used.
-- **🔋 True Background Suspension**: When the sidebar is hidden or Obsidian is backgrounded, the plugin stops health probes and unloads the iframe; it restores the exact DSH URL when the view returns.
+- **📥 Confirmed Session Export**: Click `📥` to choose the exact DSH session to export. Re-exporting the same session refreshes only its managed transcript block while preserving human notes and its stable ID.
+- **🔋 Delayed Background Suspension**: When the sidebar is hidden or Obsidian is backgrounded, the plugin stops health probes immediately and unloads the iframe only after five minutes of inactivity.
+- **📐 Responsive Sidebar Header**: Narrow sidebars keep the internal sidebar toggle and live status visible while moving secondary actions into a keyboard-friendly native menu.
+- **♿ Accessible Interaction**: Action buttons expose clear labels and pressed states, connection status is announced politely, focus rings stay visible, and reduced-motion preferences are respected.
 - **🟢 Live Status & Latency Pill**: Real-time status badge monitoring `http://127.0.0.1:3080` with response latency and offline recovery card.
 - **🎨 Crisp Frosted Glass Card**: Crafted with 14px smooth squircle corners, ambient light gradient, capsule action buttons, and full dark/light theme adaptability.
-- **🛡️ 100% Free & Local-First**: Completely free to use with no license activation required. All communication runs strictly on your local device (`127.0.0.1`).
+- **🛡️ 100% Free & Local-First**: Completely free to use with no license activation required. Loopback addresses are enforced by default; remote servers require an explicit opt-in.
 
 ---
 
@@ -62,6 +64,7 @@ By default, the web interface will be accessible at `http://127.0.0.1:3080`.
 | Setting | Description | Default |
 | :--- | :--- | :--- |
 | **Server URL** | DeepSeek Harness Web address | `http://127.0.0.1:3080` |
+| **Allow Remote Server** | Explicitly allow a trusted non-loopback DSH server | `Disabled` |
 | **Sidebar Mode** | `Auto-Hide (Hover)` / `Manual Toggle` / `Always Show` | `Auto-Hide` |
 | **Sidebar Offset** | Internal icon sidebar width compensation | `52px` |
 | **Zoom Level** | Interface scaling (85% ~ 105%) | `100%` |
@@ -74,9 +77,10 @@ By default, the web interface will be accessible at `http://127.0.0.1:3080`.
 
 ## 🔒 Privacy & Security
 
-- **Zero Cloud Relay**: This plugin connects exclusively to your local loopback address (`127.0.0.1`). No telemetry, analytics, or third-party servers are involved.
+- **Local by Default**: The plugin accepts only `localhost`, `127.0.0.1`, and `::1` unless remote access is explicitly enabled.
+- **Least-Privilege Embed**: The embedded page receives clipboard access only; camera and microphone permissions are not requested.
 - **No License / No Activation**: Crisp DSH is 100% free and open-source under the MIT License.
-- **Data Isolation**: Your vault notes, conversations, and prompts remain completely local on your machine.
+- **Data Isolation**: With the default loopback configuration, vault notes, conversations, and prompts remain on your machine. Remote mode sends DSH traffic to the explicitly configured server.
 
 ---
 
