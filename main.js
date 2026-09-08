@@ -41,6 +41,7 @@ const ICONS = {
   save: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
   context: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>`,
+  key: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>`,
   more: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none"/></svg>`
 };
 
@@ -641,7 +642,7 @@ class CrispDshView extends ItemView {
 
     // Fallback Overlay inside card
     this.fallbackEl = this.viewportEl.createDiv({ cls: "crisp-dsh-fallback-overlay" });
-    this.buildOfflineFallback(this.fallbackEl);
+    this.renderFallbackContent();
     this.fallbackEl.style.display = "none";
   }
 
@@ -684,34 +685,104 @@ class CrispDshView extends ItemView {
   }
 
   buildOfflineFallback(container) {
+    this.renderFallbackContent(container);
+  }
+
+  renderFallbackContent(targetContainer) {
+    const container = targetContainer || this.fallbackEl;
+    if (!container) return;
+    container.empty();
+
+    const isAuth = this.status === "auth-required";
     const inner = container.createDiv({ cls: "crisp-dsh-fallback-inner" });
 
-    const hero = inner.createDiv({ cls: "crisp-dsh-fallback-hero" });
-    hero.innerHTML = ICONS.deepseek;
-
-    inner.createDiv({ cls: "crisp-dsh-fallback-title", text: "DeepSeek Harness 未运行" });
-    inner.createDiv({
-      cls: "crisp-dsh-fallback-desc",
-      text: "请在终端中启动本地服务，或检查服务端口设置。"
+    const hero = inner.createDiv({
+      cls: `crisp-dsh-fallback-hero ${isAuth ? "is-auth-required" : ""}`
     });
+    hero.innerHTML = isAuth ? ICONS.key : ICONS.deepseek;
 
-    // Command Box
-    const codeBox = inner.createDiv({ cls: "crisp-dsh-code-box" });
-    const codeText = codeBox.createSpan({
-      cls: "crisp-dsh-code-text",
-      text: this.plugin.settings.launchCommand || "npx @deepseek-ai/dsh web"
-    });
+    const port = this.extractPort(this.plugin.settings.serverUrl) || "3080";
 
-    const copyBtn = codeBox.createEl("button", { cls: "crisp-dsh-copy-btn" });
-    copyBtn.innerHTML = `${ICONS.copy} <span>复制</span>`;
-    copyBtn.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(codeText.innerText);
-      copyBtn.innerHTML = `${ICONS.copy} <span>已复制!</span>`;
-      setTimeout(() => {
-        copyBtn.innerHTML = `${ICONS.copy} <span>复制</span>`;
-      }, 2000);
-      new Notice("启动命令已复制到剪贴板");
-    });
+    if (isAuth) {
+      inner.createDiv({ cls: "crisp-dsh-fallback-title", text: "DSH 服务需要启动 Token (401)" });
+      inner.createDiv({
+        cls: "crisp-dsh-fallback-desc",
+        text: `本地服务已在端口 ${port} 启动，但启用了安全鉴权。请从终端输出中复制包含 ?token=... 的完整链接并粘贴至下方。`
+      });
+
+      // Quick Token / URL Form
+      const formBox = inner.createDiv({ cls: "crisp-dsh-quick-url-box" });
+      const input = formBox.createEl("input", {
+        cls: "crisp-dsh-quick-url-input",
+        type: "text",
+        placeholder: "http://127.0.0.1:3080/?token=..."
+      });
+      input.value = this.plugin.settings.serverUrl || "";
+
+      const btnRow = formBox.createDiv({ cls: "crisp-dsh-quick-url-actions" });
+      const pasteBtn = btnRow.createEl("button", {
+        cls: "crisp-dsh-btn-secondary",
+        text: "粘贴剪贴板"
+      });
+      pasteBtn.addEventListener("click", async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) {
+            input.value = text.trim();
+            input.focus();
+          }
+        } catch (e) {
+          new Notice("无法读取剪贴板，请手动粘贴");
+        }
+      });
+
+      const applyBtn = btnRow.createEl("button", {
+        cls: "crisp-dsh-btn-primary",
+        text: "保存并连接"
+      });
+      applyBtn.addEventListener("click", async () => {
+        const val = input.value.trim();
+        if (!val) {
+          new Notice("请输入有效的 DSH 服务地址");
+          return;
+        }
+        let sanitized;
+        try {
+          sanitized = normalizeAllowedServerUrl(val, this.plugin.settings.allowRemoteServer);
+        } catch (err) {
+          new Notice(err.message);
+          return;
+        }
+        this.plugin.settings.serverUrl = sanitized;
+        await this.plugin.saveSettings();
+        applyBtn.setText("连接中...");
+        await this.checkConnection(false);
+      });
+    } else {
+      inner.createDiv({ cls: "crisp-dsh-fallback-title", text: "DeepSeek Harness 未运行" });
+      inner.createDiv({
+        cls: "crisp-dsh-fallback-desc",
+        text: "请在终端中启动本地服务，或检查服务端口设置。"
+      });
+
+      // Command Box
+      const codeBox = inner.createDiv({ cls: "crisp-dsh-code-box" });
+      const codeText = codeBox.createSpan({
+        cls: "crisp-dsh-code-text",
+        text: this.plugin.settings.launchCommand || "npx @deepseek-ai/dsh web"
+      });
+
+      const copyBtn = codeBox.createEl("button", { cls: "crisp-dsh-copy-btn" });
+      copyBtn.innerHTML = `${ICONS.copy} <span>复制</span>`;
+      copyBtn.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(codeText.innerText);
+        copyBtn.innerHTML = `${ICONS.copy} <span>已复制!</span>`;
+        setTimeout(() => {
+          copyBtn.innerHTML = `${ICONS.copy} <span>复制</span>`;
+        }, 2000);
+        new Notice("启动命令已复制到剪贴板");
+      });
+    }
 
     // Action Buttons
     const actions = inner.createDiv({ cls: "crisp-dsh-fallback-actions" });
@@ -787,11 +858,21 @@ class CrispDshView extends ItemView {
 
       this.latency = Date.now() - startTime;
 
-      if (response && response.status >= 200 && response.status < 500) {
+      if (response && response.status >= 200 && response.status < 400) {
         this.updateStatus("online");
         this.ensureLoaded(url);
         return true;
+      } else if (response && (response.status === 401 || response.status === 403)) {
+        this.suspendedIframeSrc = null;
+        if (this.iframeEl) this.iframeEl.src = "about:blank";
+        this.updateStatus("auth-required");
+        if (!silent) {
+          new Notice("DSH 服务需要启动 Token (401)，请在卡片中填入终端输出的完整链接");
+        }
+        return false;
       } else {
+        this.suspendedIframeSrc = null;
+        if (this.iframeEl) this.iframeEl.src = "about:blank";
         this.updateStatus("offline");
         return false;
       }
@@ -813,6 +894,14 @@ class CrispDshView extends ItemView {
           "title",
           `DeepSeek Harness 服务正常 · 延迟: ${this.latency !== null ? this.latency : 1}ms`
         );
+      } else if (status === "auth-required") {
+        const port = this.extractPort(this.plugin.settings.serverUrl) || "3080";
+        this.statusTextEl.setText(`${port} · 需鉴权`);
+        this.statusEl.setAttribute("aria-label", `DSH 服务需要启动 Token (401)，按下可重新检查连接`);
+        this.statusEl.setAttribute(
+          "title",
+          "DeepSeek Harness 需要鉴权 Token · 请将终端输出的带 ?token=... 完整链接填入设置"
+        );
       } else if (status === "offline") {
         this.statusTextEl.setText("服务离线");
         this.statusEl.setAttribute("aria-label", "DSH 服务离线，按下可重试连接");
@@ -831,9 +920,12 @@ class CrispDshView extends ItemView {
     if (status === "online") {
       if (this.fallbackEl) this.fallbackEl.style.display = "none";
       if (this.frameWrapperEl) this.frameWrapperEl.style.display = "block";
-    } else if (status === "offline") {
+    } else {
       if (this.frameWrapperEl) this.frameWrapperEl.style.display = "none";
-      if (this.fallbackEl) this.fallbackEl.style.display = "flex";
+      if (this.fallbackEl) {
+        this.renderFallbackContent();
+        this.fallbackEl.style.display = "flex";
+      }
     }
   }
 
@@ -1031,10 +1123,10 @@ class CrispDshSettingTab extends PluginSettingTab {
 
     new Setting(connContent)
       .setName("服务地址 (Server URL)")
-      .setDesc("DeepSeek Harness Web 运行地址，默认：http://127.0.0.1:3080")
+      .setDesc("DeepSeek Harness Web 运行地址（默认：http://127.0.0.1:3080）。若终端启用了安全鉴权（提示 401），可直接在此粘贴含 ?token=... 的完整链接")
       .addText((text) =>
         text
-          .setPlaceholder("http://127.0.0.1:3080")
+          .setPlaceholder("http://127.0.0.1:3080/?token=...")
           .setValue(this.plugin.settings.serverUrl)
           .onChange(async (value) => {
             let sanitized;

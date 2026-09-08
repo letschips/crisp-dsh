@@ -64,6 +64,19 @@ test("normalizeAllowedServerUrl accepts loopback hosts by default", () => {
   assert.equal(normalizeAllowedServerUrl("http://[::1]:3080", false), "http://[::1]:3080/");
 });
 
+test("normalizeAllowedServerUrl preserves query tokens for authenticated sessions", () => {
+  const { normalizeAllowedServerUrl } = CrispDshPlugin.__test;
+
+  assert.equal(
+    normalizeAllowedServerUrl("http://127.0.0.1:3080/?token=sec_abc123", false),
+    "http://127.0.0.1:3080/?token=sec_abc123"
+  );
+  assert.equal(
+    normalizeAllowedServerUrl("127.0.0.1:3080/?token=sec_xyz789&mode=full", false),
+    "http://127.0.0.1:3080/?token=sec_xyz789&mode=full"
+  );
+});
+
 test("normalizeAllowedServerUrl rejects remote hosts unless explicitly enabled", () => {
   const { normalizeAllowedServerUrl } = CrispDshPlugin.__test;
 
