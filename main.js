@@ -633,8 +633,7 @@ class CrispDshView extends ItemView {
       attr: {
         src: "about:blank",
         title: "DeepSeek Harness",
-        allow: "clipboard-read; clipboard-write",
-        sandbox: "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
+        allow: "clipboard-read; clipboard-write"
       }
     });
 
@@ -826,26 +825,82 @@ class CrispDshView extends ItemView {
     }
   }
 
-  probeServerStatus(targetUrl) {
+  async getSessionCookieHeader(targetUrl) {
+    try {
+      const electron = typeof window !== "undefined" && window.require ? (window.require("@electron/remote") || window.require("electron")) : null;
+      const session = electron?.session || electron?.remote?.session;
+      if (session?.defaultSession?.cookies) {
+        const cookies = await session.defaultSession.cookies.get({ url: targetUrl });
+        if (cookies && cookies.length > 0) {
+          return cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return "";
+  }
+
+  async syncResponseCookies(targetUrl, setCookieHeaders) {
+    if (!setCookieHeaders) return;
+    const rawList = Array.isArray(setCookieHeaders) ? setCookieHeaders : [setCookieHeaders];
+    try {
+      const electron = typeof window !== "undefined" && window.require ? (window.require("@electron/remote") || window.require("electron")) : null;
+      const session = electron?.session || electron?.remote?.session;
+      if (session?.defaultSession?.cookies) {
+        for (const raw of rawList) {
+          const [pair] = raw.split(";");
+          const idx = pair.indexOf("=");
+          if (idx !== -1) {
+            const name = pair.slice(0, idx).trim();
+            const value = pair.slice(idx + 1).trim();
+            await session.defaultSession.cookies.set({
+              url: targetUrl,
+              name,
+              value,
+              path: "/",
+              httpOnly: true,
+              secure: true,
+              sameSite: "no_restriction"
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  async probeServerStatus(targetUrl) {
+    const cookieHeader = await this.getSessionCookieHeader(targetUrl);
     return new Promise((resolve) => {
       try {
         const parsed = new URL(targetUrl);
         const isHttps = parsed.protocol === "https:";
         const lib = isHttps ? require("https") : require("http");
+        const headers = {
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "User-Agent": "Mozilla/5.0 Obsidian-Crisp-DSH"
+        };
+        if (cookieHeader) {
+          headers["Cookie"] = cookieHeader;
+        }
+
         const req = lib.request(
           targetUrl,
           {
             method: "GET",
-            headers: {
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-              "User-Agent": "Mozilla/5.0 Obsidian-Crisp-DSH"
-            },
+            headers,
             timeout: 4000
           },
-          (res) => {
+          async (res) => {
+            const headers = res.headers || {};
+            if (headers["set-cookie"]) {
+              await this.syncResponseCookies(targetUrl, headers["set-cookie"]);
+            }
             resolve({
               status: res.statusCode || 0,
-              headers: res.headers || {}
+              headers
             });
           }
         );
@@ -857,8 +912,18 @@ class CrispDshView extends ItemView {
         req.end();
       } catch (err) {
         try {
-          requestUrl({ url: targetUrl, method: "GET", throw: false })
-            .then((res) => resolve({ status: res.status || 0, headers: res.headers || {} }))
+          const options = { url: targetUrl, method: "GET", throw: false };
+          if (cookieHeader) {
+            options.headers = { Cookie: cookieHeader };
+          }
+          requestUrl(options)
+            .then(async (res) => {
+              const headers = res.headers || {};
+              if (headers["set-cookie"]) {
+                await this.syncResponseCookies(targetUrl, headers["set-cookie"]);
+              }
+              resolve({ status: res.status || 0, headers });
+            })
             .catch((e) => resolve({ status: 0, error: e }));
         } catch (e) {
           resolve({ status: 0, error: e });
