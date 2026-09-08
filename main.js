@@ -826,6 +826,47 @@ class CrispDshView extends ItemView {
     }
   }
 
+  probeServerStatus(targetUrl) {
+    return new Promise((resolve) => {
+      try {
+        const parsed = new URL(targetUrl);
+        const isHttps = parsed.protocol === "https:";
+        const lib = isHttps ? require("https") : require("http");
+        const req = lib.request(
+          targetUrl,
+          {
+            method: "GET",
+            headers: {
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "User-Agent": "Mozilla/5.0 Obsidian-Crisp-DSH"
+            },
+            timeout: 4000
+          },
+          (res) => {
+            resolve({
+              status: res.statusCode || 0,
+              headers: res.headers || {}
+            });
+          }
+        );
+        req.on("error", (err) => resolve({ status: 0, error: err }));
+        req.on("timeout", () => {
+          req.destroy();
+          resolve({ status: 0, error: new Error("timeout") });
+        });
+        req.end();
+      } catch (err) {
+        try {
+          requestUrl({ url: targetUrl, method: "GET", throw: false })
+            .then((res) => resolve({ status: res.status || 0, headers: res.headers || {} }))
+            .catch((e) => resolve({ status: 0, error: e }));
+        } catch (e) {
+          resolve({ status: 0, error: e });
+        }
+      }
+    });
+  }
+
   async checkConnection(silent = false) {
     const rawUrl = (this.plugin.settings.serverUrl || "").trim();
     if (!rawUrl) {
@@ -850,15 +891,17 @@ class CrispDshView extends ItemView {
 
     const startTime = Date.now();
     try {
-      const response = await requestUrl({
-        url: url,
-        method: "GET",
-        throw: false
-      });
+      const response = await this.probeServerStatus(url);
 
       this.latency = Date.now() - startTime;
 
-      if (response && response.status >= 200 && response.status < 400) {
+      const isOnline = response && (
+        (response.status >= 200 && response.status < 400)
+        || response.status === 303
+        || response.status === 302
+      );
+
+      if (isOnline) {
         this.updateStatus("online");
         this.ensureLoaded(url);
         return true;
