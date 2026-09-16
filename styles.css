@@ -336,6 +336,132 @@
   50% { opacity: 1; transform: scale(1.2); }
 }
 
+/* Explicit Obsidian context tray kept outside DSH's iframe */
+.crisp-dsh-context-tray {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--crisp-dsh-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-sizing: border-box;
+}
+
+.crisp-dsh-context-tray__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.crisp-dsh-context-tray__label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crisp-dsh-context-tray__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.crisp-dsh-context-tray__copy,
+.crisp-dsh-context-tray__clear,
+.crisp-dsh-context-chip__remove {
+  border: 0;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.crisp-dsh-context-tray__copy,
+.crisp-dsh-context-tray__clear {
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+}
+
+.crisp-dsh-context-tray__copy:hover,
+.crisp-dsh-context-tray__clear:hover {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--text-normal) 10%, transparent);
+}
+
+.crisp-dsh-context-tray__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+  min-width: 0;
+}
+
+.crisp-dsh-context-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: 3px;
+  padding: 3px 4px 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--crisp-dsh-accent) 24%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--crisp-dsh-accent) 8%, transparent);
+  color: var(--text-normal);
+  font-size: 10px;
+}
+
+.crisp-dsh-context-chip__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crisp-dsh-context-chip__meta {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.crisp-dsh-context-chip__remove {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 14px;
+}
+
+.crisp-dsh-context-chip__remove:hover {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--text-normal) 13%, transparent);
+}
+
+.crisp-dsh-context-tray__copy:focus-visible,
+.crisp-dsh-context-tray__clear:focus-visible,
+.crisp-dsh-context-chip__remove:focus-visible {
+  outline: 2px solid var(--crisp-dsh-accent);
+  outline-offset: 1px;
+}
+
+@container crisp-dsh (max-width: 340px) {
+  .crisp-dsh-context-tray {
+    padding: 7px 8px;
+  }
+
+  .crisp-dsh-context-chip {
+    max-width: 100%;
+  }
+}
+
 /* Crisp Frosted Glass Card (Clean 100% Smooth Rounded Corners) */
 .crisp-dsh-card {
   position: relative;
@@ -721,6 +847,105 @@
 .crisp-dsh-setting-card__content {
   padding: 0 15px 12px 15px;
   border-top: 1px solid var(--crisp-dsh-border);
+}
+
+/* Native glass presentation for macOS translucent windows.
+   DeepSeek stays inside the iframe; this scope belongs only to DSH's shell. */
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view {
+  --crisp-dsh-surface: color-mix(in srgb, var(--background-primary) 12%, transparent);
+  --crisp-dsh-border: color-mix(in srgb, var(--text-normal) 13%, transparent);
+  --crisp-dsh-glass-control: color-mix(in srgb, var(--text-normal) 6%, transparent);
+  --crisp-dsh-glass-hover: color-mix(in srgb, var(--text-normal) 10%, transparent);
+  --crisp-dsh-glass-rim: rgba(255, 255, 255, 0.16);
+  --text-muted: color-mix(in srgb, var(--text-normal) 78%, transparent);
+  --text-faint: color-mix(in srgb, var(--text-normal) 66%, transparent);
+  background: transparent !important;
+}
+
+body.is-translucent.theme-light:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view {
+  --crisp-dsh-glass-rim: rgba(255, 255, 255, 0.65);
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal)
+.workspace-leaf-content[data-type="crisp-dsh-view"] .view-content {
+  background:
+    radial-gradient(
+      circle at 88% 4%,
+      color-mix(in srgb, #4D6BFE 10%, transparent),
+      transparent 42%
+    ),
+    transparent !important;
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-mark {
+  background: color-mix(in srgb, #4D6BFE 12%, transparent);
+  box-shadow: inset 0 1px 0 var(--crisp-dsh-glass-rim), 0 8px 22px rgba(77, 107, 254, 0.14);
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-header-actions,
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-status {
+  background: var(--crisp-dsh-glass-control) !important;
+  border-color: var(--crisp-dsh-border);
+  box-shadow: inset 0 1px 0 var(--crisp-dsh-glass-rim), 0 6px 22px rgba(0, 0, 0, 0.1);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  backdrop-filter: blur(16px) saturate(135%);
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-action-btn {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: color-mix(in srgb, var(--text-normal) 78%, transparent) !important;
+  box-shadow: none;
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-action-btn:hover {
+  background: var(--crisp-dsh-glass-hover) !important;
+  border-color: var(--crisp-dsh-border) !important;
+  color: var(--text-normal) !important;
+  transform: none;
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-action-btn:active {
+  background: color-mix(in srgb, var(--text-normal) 13%, transparent) !important;
+  transform: none;
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-action-btn.is-active {
+  background: color-mix(in srgb, #4D6BFE 18%, transparent) !important;
+  border-color: color-mix(in srgb, #4D6BFE 28%, transparent) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-status:hover {
+  background: var(--crisp-dsh-glass-hover) !important;
+  border-color: var(--crisp-dsh-border);
+  transform: none;
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-status.is-online {
+  background: color-mix(in srgb, #22c55e 12%, transparent) !important;
+  border-color: color-mix(in srgb, #22c55e 35%, transparent);
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-status.is-offline {
+  background: color-mix(in srgb, var(--color-red, #ef4444) 10%, transparent) !important;
+}
+
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-status.is-connecting,
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
+.crisp-dsh-status.is-auth-required {
+  background: color-mix(in srgb, #f59e0b 11%, transparent) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
