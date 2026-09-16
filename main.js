@@ -732,7 +732,7 @@ class DshSessionSuggestModal extends FuzzySuggestModal {
       { command: "esc", purpose: "取消" }
     ]);
     this.settled = false;
-    this.selection = new Promise((resolve) => {
+    this.choicePromise = new Promise((resolve) => {
       this.resolveSelection = resolve;
     });
   }
@@ -749,21 +749,30 @@ class DshSessionSuggestModal extends FuzzySuggestModal {
   }
 
   onChooseItem(session) {
+    if (this.settled) return;
     this.settled = true;
     this.resolveSelection(session);
   }
 
+  selectSuggestion(suggestion, event) {
+    this.onChooseItem(suggestion.item);
+    super.selectSuggestion(suggestion, event);
+  }
+
   onClose() {
     super.onClose();
-    if (!this.settled) {
-      this.settled = true;
-      this.resolveSelection(null);
-    }
+    // Obsidian closes the modal before calling onChooseItem.
+    queueMicrotask(() => {
+      if (!this.settled) {
+        this.settled = true;
+        this.resolveSelection(null);
+      }
+    });
   }
 
   async choose() {
     this.open();
-    return this.selection;
+    return this.choicePromise;
   }
 }
 
@@ -778,7 +787,7 @@ class DshContextSuggestModal extends FuzzySuggestModal {
       { command: "esc", purpose: "取消" }
     ]);
     this.settled = false;
-    this.selection = new Promise((resolve) => {
+    this.choicePromise = new Promise((resolve) => {
       this.resolveSelection = resolve;
     });
   }
@@ -792,21 +801,30 @@ class DshContextSuggestModal extends FuzzySuggestModal {
   }
 
   onChooseItem(item) {
+    if (this.settled) return;
     this.settled = true;
     this.resolveSelection(item);
   }
 
+  selectSuggestion(suggestion, event) {
+    this.onChooseItem(suggestion.item);
+    super.selectSuggestion(suggestion, event);
+  }
+
   onClose() {
     super.onClose();
-    if (!this.settled) {
-      this.settled = true;
-      this.resolveSelection(null);
-    }
+    // Obsidian closes the modal before calling onChooseItem.
+    queueMicrotask(() => {
+      if (!this.settled) {
+        this.settled = true;
+        this.resolveSelection(null);
+      }
+    });
   }
 
   async choose() {
     this.open();
-    return this.selection;
+    return this.choicePromise;
   }
 }
 
@@ -2270,6 +2288,16 @@ module.exports = class CrispDshPlugin extends Plugin {
   }
 
   async startDshService({ silent = false } = {}) {
+    if (this.dshStartPromise) return this.dshStartPromise;
+    this.dshStartPromise = this.launchDshService({ silent });
+    try {
+      return await this.dshStartPromise;
+    } finally {
+      this.dshStartPromise = null;
+    }
+  }
+
+  async launchDshService({ silent = false } = {}) {
     if (this.dshProcess && !this.dshProcess.killed && this.dshProcess.exitCode === null) {
       if (!silent) new Notice("Crisp DSH 已经在启动服务");
       return true;
@@ -2462,14 +2490,12 @@ module.exports = class CrispDshPlugin extends Plugin {
 
       const existingFile = await this.findExistingSessionExport(session.sessionId, folderPath);
       if (existingFile) {
-        const existingContent = await this.app.vault.cachedRead(existingFile);
         try {
-          const updatedContent = updateManagedResearchNote(existingContent, transcript, now, {
+          await this.app.vault.process(existingFile, (existingContent) => updateManagedResearchNote(existingContent, transcript, now, {
             exportMode,
             messageLimit,
             evidenceEntries: exportData.evidenceEntries
-          });
-          await this.app.vault.modify(existingFile, updatedContent);
+          }));
           new Notice(`已更新 DSH 会话「${sessionTitle(session)}」的现有笔记`);
         } catch (error) {
           new Notice("该会话已有旧版导出笔记；为保护人工内容，已打开原文件但未覆盖");
@@ -2634,6 +2660,8 @@ module.exports = class CrispDshPlugin extends Plugin {
 };
 
 module.exports.__test = {
+  DshSessionSuggestModal,
+  DshContextSuggestModal,
   sidebarIconSvg: ICONS.sidebar,
   CrispDshView,
   normalizeAllowedServerUrl,

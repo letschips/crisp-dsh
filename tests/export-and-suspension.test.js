@@ -8,7 +8,12 @@ const originalLoad = Module._load;
 let requestUrlImpl = async () => ({});
 Module._load = function(request, parent, isMain) {
   if (request === "obsidian") {
-    class Empty {}
+    class Empty {
+      setPlaceholder() {}
+      setInstructions() {}
+      onClose() {}
+      open() { this.selection = { focusEl: "host-owned selection" }; }
+    }
     return {
       Plugin: Empty,
       ItemView: Empty,
@@ -25,6 +30,36 @@ Module._load = function(request, parent, isMain) {
 
 const CrispDshPlugin = require("../main.js");
 Module._load = originalLoad;
+
+test("both pickers resolve the chosen item after Obsidian closes the modal first", async () => {
+  for (const Modal of [CrispDshPlugin.__test.DshSessionSuggestModal, CrispDshPlugin.__test.DshContextSuggestModal]) {
+    const item = { sessionId: "chosen", path: "note.md" };
+    const modal = new Modal({}, [item]);
+    const chosen = modal.choose();
+    modal.onClose();
+    modal.onChooseItem(item);
+    assert.equal(await chosen, item);
+    const cancelled = new Modal({}, []);
+    cancelled.onClose();
+    assert.equal(await cancelled.choicePromise, null);
+  }
+});
+
+test("concurrent start requests share the same pending launch", async () => {
+  const plugin = Object.create(CrispDshPlugin.prototype);
+  let calls = 0;
+  let finish;
+  plugin.launchDshService = () => { calls++; return new Promise(resolve => { finish = resolve; }); };
+  const first = plugin.startDshService();
+  const second = plugin.startDshService();
+  assert.equal(calls, 1);
+  finish(true);
+  assert.deepEqual(await Promise.all([first, second]), [true, true]);
+  const third = plugin.startDshService();
+  assert.equal(calls, 2);
+  finish(false);
+  assert.equal(await third, false);
+});
 
 test("sidebar toggle uses the supplied flip-h outline icon", () => {
   const { sidebarIconSvg } = CrispDshPlugin.__test;
