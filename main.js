@@ -147,22 +147,34 @@ async function syncElectronCookies(targetUrl, setCookieHeaders) {
       : null;
     const session = electron?.session || electron?.remote?.session;
     if (!session?.defaultSession?.cookies) return;
-    const secure = new URL(targetUrl).protocol === "https:";
     for (const raw of rawList) {
       const [pair] = String(raw).split(";");
       const idx = pair.indexOf("=");
       if (idx === -1) continue;
       const name = pair.slice(0, idx).trim();
       const value = pair.slice(idx + 1).trim();
-      await session.defaultSession.cookies.set({
-        url: targetUrl,
-        name,
-        value,
-        path: "/",
-        httpOnly: true,
-        secure,
-        sameSite: "strict"
-      });
+      try {
+        await session.defaultSession.cookies.set({
+          url: targetUrl,
+          name,
+          value,
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "no_restriction"
+        });
+      } catch (error) {
+        const secure = new URL(targetUrl).protocol === "https:";
+        await session.defaultSession.cookies.set({
+          url: targetUrl,
+          name,
+          value,
+          path: "/",
+          httpOnly: true,
+          secure,
+          sameSite: "unspecified"
+        });
+      }
     }
   } catch (error) {
     // Cookie persistence is best-effort and must not hide the API response.
