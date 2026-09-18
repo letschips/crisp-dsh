@@ -4,16 +4,10 @@
    Matching Crisp Suite Design Language (Crisp ASR / Crisp Base / Crisp Style)
    ========================================================================== */
 
-/* Workspace Leaf Content Override - Translucency & Ambient Glow */
+/* Workspace Leaf Content Override - Ambient Integration */
 .workspace-leaf-content[data-type="crisp-dsh-view"] .view-content {
   padding: 0 !important;
-  background:
-    radial-gradient(
-      circle at 88% 4%,
-      color-mix(in srgb, #4D6BFE 12%, transparent),
-      transparent 38%
-    ),
-    var(--background-primary);
+  background: var(--background-primary);
   overflow: hidden;
 }
 
@@ -21,11 +15,7 @@
 .crisp-dsh-view {
   --crisp-dsh-accent: #4D6BFE;
   --crisp-dsh-border: color-mix(in srgb, var(--text-normal) 9%, transparent);
-  --crisp-dsh-surface: color-mix(
-    in srgb,
-    var(--background-secondary) 76%,
-    transparent
-  );
+  --crisp-dsh-surface: var(--background-primary);
   --crisp-dsh-offset: 52px;
   color: var(--text-normal);
   font-family: var(--font-interface);
@@ -852,7 +842,7 @@
 /* Native glass presentation for macOS translucent windows.
    DeepSeek stays inside the iframe; this scope belongs only to DSH's shell. */
 body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view {
-  --crisp-dsh-surface: color-mix(in srgb, var(--background-primary) 12%, transparent);
+  --crisp-dsh-surface: var(--background-primary);
   --crisp-dsh-border: color-mix(in srgb, var(--text-normal) 13%, transparent);
   --crisp-dsh-glass-control: color-mix(in srgb, var(--text-normal) 6%, transparent);
   --crisp-dsh-glass-hover: color-mix(in srgb, var(--text-normal) 10%, transparent);
@@ -862,19 +852,19 @@ body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
   background: transparent !important;
 }
 
+body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view .crisp-dsh-card {
+  background: var(--background-primary) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 body.is-translucent.theme-light:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view {
   --crisp-dsh-glass-rim: rgba(255, 255, 255, 0.65);
 }
 
 body.is-translucent:not(.is-popout-window):not(.is-popout-modal)
 .workspace-leaf-content[data-type="crisp-dsh-view"] .view-content {
-  background:
-    radial-gradient(
-      circle at 88% 4%,
-      color-mix(in srgb, #4D6BFE 10%, transparent),
-      transparent 42%
-    ),
-    transparent !important;
+  background: transparent !important;
 }
 
 body.is-translucent:not(.is-popout-window):not(.is-popout-modal) .crisp-dsh-view
